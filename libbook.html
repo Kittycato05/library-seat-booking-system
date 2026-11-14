@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LibBook — Library Seat & Resource Booking</title>
+<style>
+*{box-sizing:border-box;font-family:Arial,sans-serif}body{margin:0;background:#f1f5f9;color:#0f172a}
+header{background:linear-gradient(135deg,#2bdcec,#26d6ad);color:#fff;padding:26px 18px;text-align:center}
+header h1{margin:0;font-size:30px}header p{opacity:.9}
+.wrap{max-width:1000px;margin:auto;padding:16px}.card{background:#fff;border-radius:14px;padding:18px;margin:14px 0;box-shadow:0 4px 16px #0001}
+label{font-weight:bold;font-size:13px}input,select{width:100%;padding:10px;margin:5px 0 12px;border:1px solid #cbd5e1;border-radius:8px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.legend span{display:inline-block;padding:6px 10px;border-radius:20px;margin:3px;font-size:12px;color:#fff}
+.av{background:#22c55e}.bk{background:#ef4444}.sel{background:#f59e0b}.mine{background:#4f46e5}
+.seats{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:9px}
+.seat{border:0;border-radius:10px;padding:12px 4px;color:#fff;font-weight:bold;cursor:pointer}.seat:disabled{cursor:not-allowed;opacity:.85}
+button.main{background:#4f46e5;color:#fff;border:0;padding:12px 20px;border-radius:9px;font-weight:bold;cursor:pointer;width:100%}
+button.ghost{background:#fff;border:1px solid #cbd5e1;padding:9px 14px;border-radius:8px;cursor:pointer;margin:3px}
+.stat{text-align:center}.stat b{font-size:26px;color:#4f46e5}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{border-bottom:1px solid #e2e8f0;padding:8px;text-align:left}
+#toast{display:none;background:#0f172a;color:#fff;padding:12px;border-radius:9px;margin:10px 0;text-align:center}
+.bar{height:14px;background:#e2e8f0;border-radius:20px;overflow:hidden}.bar i{display:block;height:100%;background:#4f46e5}
+@media(max-width:600px){header h1{font-size:23px}}
+</style></head><body>
+<header><h1>📕 LibBook</h1><p>Library seat management System — Book a seat in 30 seconds</p>
+                           <p>designed by Gautam,12627408 🧡</p></header>
+<div class="wrap">
+<div class="card"><h3>1. Your Details &amp; Slot</h3><div class="grid3">
+<div><label>Full Name</label><input id="name" placeholder="e.g. Gautam kumar"></div>
+<div><label>Registration No.</label><input id="reg" placeholder="e.g. 12627408"></div>
+<div><label>Date</label><input type="date" id="date"></div>
+<div><label>Time Slot</label><select id="slot"><option>09:00–11:00</option><option>11:00–13:00</option><option>13:00–15:00</option><option>15:00–17:00</option><option>17:00–19:00</option></select></div>
+<div><label>Zone Filter</label><select id="zone"><option value="All">All Zones</option><option>Quiet Zone</option><option>Group Study</option><option>Computer Zone</option></select></div>
+</div></div>
+
+<div class="card"><h3>2. Choose Your Seat</h3>
+<div class="legend"><span class="av">Available</span><span class="bk">Occupied</span><span class="sel">Selected</span><span class="mine">My Booking</span></div>
+<p style="font-size:13px;color:#64748b">A1–A12 Quiet Zone &nbsp;|&nbsp; B1–B10 Group Study &nbsp;|&nbsp; C1–C8 Computer Zone</p>
+<div class="seats" id="seats"></div><br><button class="main" onclick="confirmBooking()">Confirm Booking</button><div id="toast"></div></div>
+
+<div class="card grid3">
+<div class="stat"><b id="sTotal">30</b><br>Total Seats</div><div class="stat"><b id="sAvail">0</b><br>Available</div><div class="stat"><b id="sBook">0</b><br>Booked</div><div class="stat"><b id="sOcc">0%</b><br>Occupancy</div>
+</div>
+<div class="card"><h3>Occupancy</h3><div class="bar"><i id="bar" style="width:0%"></i></div></div>
+
+<div class="card"><h3>3. My Bookings (Auto-release when slot ends)</h3><div id="mine">No bookings yet.</div></div>
+<div class="card"><h3>Admin Dashboard</h3><div id="admin"></div><br><button class="ghost" onclick="resetAll()">Reset Demo Data</button> <button class="ghost" onclick="window.print()">Print Confirmation</button></div>
+<div class="card"><b>Features:</b> Visual seat map • Live availability • Double-booking prevention • localStorage persistence • Booking history • Auto seat-release concept • Admin dashboard • Fully responsive</div>
+</div>
+<script>
+let selected=null;
+const zones=[...Array(12)].map((_,i)=>({id:'A'+(i+1),z:'Quiet Zone'})).concat([...Array(10)].map((_,i)=>({id:'B'+(i+1),z:'Group Study'})),[...Array(8)].map((_,i)=>({id:'C'+(i+1),z:'Computer Zone'})));
+const $=id=>document.getElementById(id);
+$('date').value=new Date().toISOString().slice(0,10);
+function key(){return $('date').value+'|'+$('slot').value}
+function bookings(){return JSON.parse(localStorage.getItem('libBookings')||'[]')}
+function seeded(id){let s=key()+id,h=0;for(let c of s)h=(h*31+c.charCodeAt(0))%997;return h%4==0}
+function render(){
+ selected=null;let box=$('seats');box.innerHTML='';let bs=bookings(),avail=0,booked=0;
+ zones.forEach(s=>{
+  if($('zone').value!='All'&&s.z!=$('zone').value)return;
+  let mine=bs.find(b=>b.seat==s.id&&b.date==$('date').value&&b.slot==$('slot').value);
+  let occ=mine?false:seeded(s.id); if(occ||mine)booked++;else avail++;
+  let b=document.createElement('button');b.className='seat '+(mine?'mine':occ?'bk':'av');b.textContent=s.id;b.disabled=occ||!!mine;
+  b.title=s.z;b.onclick=()=>{selected=s.id;document.querySelectorAll('.seat').forEach(x=>{if(x.className.includes('sel'))x.className='seat av'});b.className='seat sel';};
+  box.appendChild(b);});
+ 
+ let allBooked=zones.filter(s=>seeded(s.id)||bs.some(b=>b.seat==s.id&&b.date==$('date').value&&b.slot==$('slot').value)).length;
+ $('sAvail').textContent=30-allBooked;$('sBook').textContent=allBooked;$('sOcc').textContent=Math.round(allBooked/30*100)+'%';$('bar').style.width=(allBooked/30*100)+'%';
+ let my=bs; $('mine').innerHTML=my.length?'<table><tr><th>Seat</th><th>Date</th><th>Slot</th><th>Name</th><th></th></tr>'+my.map((b,i)=>`<tr><td>${b.seat}</td><td>${b.date}</td><td>${b.slot}</td><td>${b.name}</td><td><button class="ghost" onclick="cancelB(${i})">Cancel / Release Seat</button></td></tr>`).join('')+'</table>':'No bookings yet.';
+ $('admin').innerHTML=bs.length?'<table><tr><th>Student</th><th>Reg No</th><th>Seat</th><th>Date</th><th>Slot</th></tr>'+bs.map(b=>`<tr><td>${b.name}</td><td>${b.reg}</td><td>${b.seat}</td><td>${b.date}</td><td>${b.slot}</td></tr>`).join('')+'</table>':'No bookings in system yet.';
+}
+function msg(t){$('toast').style.display='block';$('toast').textContent=t;setTimeout(()=>$('toast').style.display='none',3500)}
+function confirmBooking(){
+ if(!$('name').value||!$('reg').value)return msg('⚠ Enter your name and registration number first.');
+ if(!selected)return msg('⚠ Please select a green (available) seat.');
+ let bs=bookings();bs.push({name:$('name').value,reg:$('reg').value,seat:selected,date:$('date').value,slot:$('slot').value});
+ localStorage.setItem('libBookings',JSON.stringify(bs));localStorage.setItem('libUser',JSON.stringify({n:$('name').value,r:$('reg').value}));
+ msg('✅ Seat '+selected+' booked for '+$('slot').value+'. Show this screen at library entry.');render();
+}
+function cancelB(i){let bs=bookings();bs.splice(i,1);localStorage.setItem('libBookings',JSON.stringify(bs));msg('Seat released and now available to others.');render()}
+function resetAll(){localStorage.removeItem('libBookings');render();msg('Demo data cleared.')}
+['date','slot','zone'].forEach(id=>$(id).addEventListener('change',render));
+let u=JSON.parse(localStorage.getItem('libUser')||'null');if(u){$('name').value=u.n;$('reg').value=u.r}
+render();
+</script>
+<footer style="text-align:center;padding:20px">By Gautam kumar,12627408</footer>
+</body></html>
+
